@@ -116,13 +116,13 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
     def create_connections(self):
         self.editSkin_btn.toggled.connect(self.check_editBtn_status)
         self.getWeighting_btn.clicked.connect(self.getWeighting_btn_clicked)
-        self.weight0_btn.clicked.connect(lambda: self.set_weight_value(0))
-        self.weight01_btn.clicked.connect(lambda: self.set_weight_value(0.1))
-        self.weight025_btn.clicked.connect(lambda: self.set_weight_value(0.25))
-        self.weight05_btn.clicked.connect(lambda: self.set_weight_value(0.5))
-        self.weight075_btn.clicked.connect(lambda: self.set_weight_value(0.75))
-        self.weight09_btn.clicked.connect(lambda: self.set_weight_value(0.9))
-        self.weight1_btn.clicked.connect(lambda: self.set_weight_value(1.0))
+        self.weight0_btn.clicked.connect(lambda: self.weight_btn_clicked(0))
+        self.weight01_btn.clicked.connect(lambda: self.weight_btn_clicked(0.1))
+        self.weight025_btn.clicked.connect(lambda: self.weight_btn_clicked(0.25))
+        self.weight05_btn.clicked.connect(lambda: self.weight_btn_clicked(0.5))
+        self.weight075_btn.clicked.connect(lambda: self.weight_btn_clicked(0.75))
+        self.weight09_btn.clicked.connect(lambda: self.weight_btn_clicked(0.9))
+        self.weight1_btn.clicked.connect(lambda: self.weight_btn_clicked(1.0))
 
     def check_editBtn_status(self):
         btnStatus = self.editSkin_btn.isChecked()
@@ -241,9 +241,36 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
         item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
         self.boneInSelectedVerts_table.setItem(row, column, item)
 
-    def set_weight_value(self, value):
-        aaa = self.boneInSelectedVerts_table.selectedRanges()
-        print(aaa)
+    def weight_btn_clicked(self, weightValue):
+        self.statusBar.clearMessage()
+        selectedBone = ''
+        #TODO list and table widgt can only have 1 selection
+        selectedRow = self.boneInSelectedVerts_table.currentRow()
+        if selectedRow != -1:
+            selectedBone = self.boneInSelectedVerts_table.item(selectedRow, 0).text()
+        else:
+            self.statusBar.showMessage('please select a bone to change weight')
+
+        selectedUVToVerts = self.get_selected_uv_to_verts()
+        singleVertList = self.make_single_vert_list(selectedUVToVerts)
+        selectedSkinCluster = self.get_skinCLusterFromUVSelection(selectedUVToVerts)
+
+        if len(singleVertList) > 0:
+            cmds.select(singleVertList[0])
+            boneWeightOn1stVert = cmds.skinPercent(selectedSkinCluster, singleVertList[0], query=True, value=True)
+
+    def set_weight_with_bone(self, selectedBone, selectedUV):
+        pass
+
+    def uvSelectToUvShell(self):
+        mel.eval('SelectUVShell')
+
+    def get_skinCLusterFromUVSelection(self,selectedUV):
+        selectedSkinCluster = ''
+        if len(selectedUV)>0:
+            selectedModel = selectedUV[0].split('.')[0]
+            selectedSkinCluster = self.get_skinClusterFromModel(selectedModel)
+        return selectedSkinCluster
 
     def refresh_boneInSkin_list(self):
         self.statusBar.clearMessage()
@@ -291,6 +318,10 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
 
     def clear_boneInSelectedVerts_table(self):
         self.boneInSelectedVerts_table.setRowCount(0)
+
+    def closeEvent(self, event):
+        print('closeEvent')
+
 
 if __name__ == "__main__":
     try:
