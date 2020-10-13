@@ -61,10 +61,6 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
         self.editSkin_btn = QtWidgets.QPushButton("Edit Skin")
         self.editSkin_btn.setCheckable(True)
         self.element_cbx = QtWidgets.QCheckBox("Select Element")
-        #self.boneInSkin_label = QtWidgets.QLabel("Bones in Skin Cluster:")
-        # TODO self.line1 = QtWidgets.QGraphicsLineItem()
-        #self.boneInSkin_list = QtWidgets.QListWidget()
-        #self.boneInSkin_list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
 
         self.weight0_btn = QtWidgets.QPushButton("0")
         self.weight01_btn = QtWidgets.QPushButton("0.1")
@@ -80,7 +76,7 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
         # TODO use selectionChange callback instead of button(slow)
         self.getWeighting_btn = QtWidgets.QPushButton("Get selected verts weighting")
 
-        self.boneInSelected_label = QtWidgets.QLabel("All weighted Bones in Selected Verts:")
+        self.boneInSelected_label = QtWidgets.QLabel("All bones in skincluster, black color means unused inselected verts")
         self.boneInSelected_label2 = QtWidgets.QLabel("(if more than one verts are selected, weight only represent the 1st vert.)")
         self.boneAndWeight_table = QtWidgets.QTableWidget()
         self.boneAndWeight_table.setColumnCount(2)
@@ -107,11 +103,6 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
         weightButtonLayout.addWidget(self.weight1_btn)
 
         utilBottonLayout = QtWidgets.QHBoxLayout()
-        #utilBottonLayout.addWidget(self.copy_btn)
-        #utilBottonLayout.addWidget(self.paste_btn)
-
-        #main_layout.addWidget(self.boneInSkin_label)
-        #main_layout.addWidget(self.boneInSkin_list)
 
         main_layout.addWidget(self.getWeighting_btn)
         main_layout.addLayout(weightButtonLayout)
@@ -153,7 +144,6 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
 
     def edit_skin_unchecked(self):
         self.statusBar.clearMessage()
-        #self.clear_boneInSkin_list()
         self.clear_boneAndWeight_table()
 
     def refresh_boneAndWeight_table_bonesOnly(self):
@@ -281,7 +271,6 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
     def weight_btn_clicked(self, weightValue):
         self.statusBar.clearMessage()
         selectedBone = ''
-        #TODO list and table widgt can only have 1 selection
         selectedRow = self.boneAndWeight_table.currentRow()
         if selectedRow != -1:
             selectedBone = self.boneAndWeight_table.item(selectedRow, 0).text()
