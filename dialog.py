@@ -1,3 +1,9 @@
+"""
+===================================================================================================================
+run this script directly or source in the script and run maxStyleSkinTool.dialog.maxStyleWeightDialog.show_dialog()
+===================================================================================================================
+"""
+
 from PySide2 import QtCore, QtWidgets
 from shiboken2 import wrapInstance
 
@@ -5,10 +11,11 @@ import maya.OpenMayaUI as omui
 import maya.cmds as cmds
 import maya.mel as mel
 import pymel.core as pm
+import re
 
 
 def maya_main_window():
-	#get maya mainwindow so our dialog could be attached to it
+    # get maya mainwindow so our dialog could be attached to it
     main_window_ptr = omui.MQtUtil.mainWindow()
     return wrapInstance(long(main_window_ptr), QtWidgets.QWidget)
 
@@ -29,16 +36,16 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
     def __init__(self, parent=maya_main_window()):
         super(maxStyleWeightDialog, self).__init__(parent)
 
+
         self.setWindowTitle("3ds Max Style Weighting Tool")
         self.setMinimumWidth(200)
         self.setMaximumWidth(400)
-        #remove question mark(help button)
+        # remove question mark(help button)
         self.setWindowFlags(self.windowFlags() ^ QtCore.Qt.WindowContextHelpButtonHint)
 
         self.create_widgets()
         self.create_layouts()
         self.create_connections()
-
 
     def create_widgets(self):
         self.editSkin_btn = QtWidgets.QPushButton("Edit Skin")
@@ -59,15 +66,22 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
 
         self.copy_btn = QtWidgets.QPushButton("Copy")
         self.paste_btn = QtWidgets.QPushButton("Paste")
+
+        # TODO use selectionChange callback instead of button
+        self.getWeighting_btn = QtWidgets.QPushButton("Get selected verts weighting")
+
         self.boneInSelected_label = QtWidgets.QLabel("All weighted Bones in Selected Verts:")
+        self.boneInSelected_label2 = QtWidgets.QLabel(
+            "(if more than one verts are selected, weight only represent the 1st vert.)")
         self.boneInSelectedVerts_table = QtWidgets.QTableWidget()
         self.boneInSelectedVerts_table.setColumnCount(2)
-        self.boneInSelectedVerts_table.setHorizontalHeaderLabels(["Bone Name","Weight"])
-        self.boneInSelectedVerts_table.setColumnWidth(0,300)
-        self.boneInSelectedVerts_table.setColumnWidth(1,50)
+        self.boneInSelectedVerts_table.setHorizontalHeaderLabels(["Bone Name", "Weight"])
+        self.boneInSelectedVerts_table.setColumnWidth(0, 250)
+        self.boneInSelectedVerts_table.setColumnWidth(1, 50)
         tableHeader = self.boneInSelectedVerts_table.horizontalHeader()
         tableHeader.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
 
+        self.statusBar = QtWidgets.QStatusBar()
 
     def create_layouts(self):
         main_layout = QtWidgets.QVBoxLayout(self)
@@ -91,49 +105,157 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
         main_layout.addWidget(self.boneInSkin_list)
 
         # TODO main_layout.addWidget(self.line1)
+        main_layout.addWidget(self.getWeighting_btn)
         main_layout.addLayout(weightButtonLayout)
         main_layout.addLayout(utilBottonLayout)
         main_layout.addWidget(self.boneInSelected_label)
+        main_layout.addWidget(self.boneInSelected_label2)
         main_layout.addWidget(self.boneInSelectedVerts_table)
+        main_layout.addWidget(self.statusBar)
 
     def create_connections(self):
         self.editSkin_btn.toggled.connect(self.check_editBtn_status)
-        self.weight0_btn.clicked.connect(self.refresh_boneInSkin_list)
-        self.weight01_btn.clicked.connect(self.set_weight_value)
-        self.weight025_btn.clicked.connect(self.set_weight_value)
+        self.getWeighting_btn.clicked.connect(self.getWeighting_btn_clicked)
+        self.weight0_btn.clicked.connect(lambda: self.set_weight_value(0))
+        self.weight01_btn.clicked.connect(lambda: self.set_weight_value(0.1))
+        self.weight025_btn.clicked.connect(lambda: self.set_weight_value(0.25))
+        self.weight05_btn.clicked.connect(lambda: self.set_weight_value(0.5))
+        self.weight075_btn.clicked.connect(lambda: self.set_weight_value(0.75))
+        self.weight09_btn.clicked.connect(lambda: self.set_weight_value(0.9))
+        self.weight1_btn.clicked.connect(lambda: self.set_weight_value(1.0))
 
     def check_editBtn_status(self):
         btnStatus = self.editSkin_btn.isChecked()
         selectedModel = self.get_selectedModel()
         if btnStatus:
-            #TODO check whether selection = None
-            self.edit_skin()
-            pm.mel.doMenuComponentSelectionExt(selectedModel, "vertex", 0)
+            # TODO check when selection mode is not in object
+            self.edit_skin_checked()
+            pm.mel.doMenuComponentSelection(selectedModel, "puv")
         else:
-            #TODO check whether selection = None
-            self.quit_edit_skin()
+            # TODO check when selection mode is not in object
+            self.edit_skin_unchecked()
             pm.mel.maintainActiveChangeSelectMode(selectedModel, 0)
 
-    def edit_skin(self):
+    def edit_skin_checked(self):
+        self.statusBar.clearMessage()
         self.refresh_boneInSkin_list()
-        self.refresh_boneInSelectedVerts_table()
-        
-    def quit_edit_skin(self):
+        # TODO use selectionChange callback so boneInSelectedVerts_table updates here
+        # self.refresh_boneInSelectedVerts_table()
+
+    def edit_skin_unchecked(self):
+        self.statusBar.clearMessage()
         self.clear_boneInSkin_list()
         self.clear_boneInSelectedVerts_table()
 
+    def getWeighting_btn_clicked(self):
+        selectedModel = self.get_selectedModel()
+        pm.mel.doMenuComponentSelection(selectedModel, "puv")
+
+        selectedUV = self.get_selected_uv()
+
+        selectedUVToVert = self.get_selected_uv_to_verts()
+        selectedSkinCluster = self.get_skinClusterFromModel(selectedModel)
+
+        (weightedBones, boneWeight) = self.get_boneAndWeight_from_verts(selectedSkinCluster, selectedUVToVert)
+        self.refresh_boneInSelectedVerts_table(weightedBones, boneWeight)
+
+        #pm.mel.doMenuComponentSelection(selectedModel, "puv")
+        #cmds.select(cl=True)
+        cmds.select(selectedUV)
+        self.statusBar.showMessage("{num} of verts selected".format(num=len(selectedUVToVert)))
+
+    def get_selected_uv(self):
+        selectedUV = cmds.filterExpand(ex=True, sm=35)
+        return selectedUV
+
+    def get_selected_uv_to_verts(self):
+        selectedUV = cmds.filterExpand(ex=True, sm=35)
+        # convert uv selection to vert selection instead of using vert selection
+        selectedUVToVerts = cmds.polyListComponentConversion(selectedUV, tv=True)
+        return selectedUVToVerts
+
+    def get_boneAndWeight_from_verts(self, selectedSkinCluster, selectedVerts):
+        weightedBoneList = []
+        singleVertList = self.make_single_vert_list(selectedVerts)
+        if len(singleVertList) > 0:
+            # only show 1st vert's weight value if more than 1 verts are selected
+            cmds.select(singleVertList[0])
+            boneWeightOn1stVert = cmds.skinPercent(selectedSkinCluster, singleVertList[0], query=True, value=True)
+            shownWeightList = []
+            fullBoneList = self.get_boneList_from_skinCluster(selectedSkinCluster)
+            for i in range(len(singleVertList)):
+                cmds.select(singleVertList[i])
+                vertIWeightList = cmds.skinPercent(selectedSkinCluster, singleVertList[i], query=True, value=True)
+                for j in range(len(vertIWeightList)):
+                    # TODO add user input for threshhold 0.01
+                    if vertIWeightList[j] > 0.01:
+                        if fullBoneList[j] not in weightedBoneList:
+                            weightedBoneList.append(fullBoneList[j])
+                            if boneWeightOn1stVert[j] != 0.0:
+                                shownWeightList.append(str(boneWeightOn1stVert[j]))
+                            else:
+                                shownWeightList.append('0.0')
+        return weightedBoneList, shownWeightList
+
+    def make_single_vert_list(self,selectedVerts):
+        fullSingleVertList = []
+        if len(selectedVerts)>0:
+            for i in range(len(selectedVerts)):
+                if ':' in selectedVerts[i]:
+                    singleVerList = self.get_single_vert_from_multiple(selectedVerts[i])
+                    for j in range(len(singleVerList)):
+                        fullSingleVertList.append(singleVerList[j])
+                else:
+                    fullSingleVertList.append(selectedVerts[i])
+        return fullSingleVertList
+
+    def get_single_vert_from_multiple(self, multipleVerts):
+        #multiple verts is something like 'testMesh.vtx[8162:8163]'
+        #return a list like ['testMesh.vtx[8162]','testMesh.vtx[8163]']
+        singleVertsList = []
+
+        strPrefix = multipleVerts.split('[')
+        # result: 'testMesh.vtx'
+
+        # getting numbers from string
+        temp = re.findall(r'\d+', multipleVerts)
+        numbers = list(map(int, temp))
+
+        for i in range(numbers[0], (numbers[1]+1)):
+            singleVert = strPrefix[0] + '[' + str(i) + ']'
+            singleVertsList.append(singleVert)
+
+        return singleVertsList
+
+    def refresh_boneInSelectedVerts_table(self, weightedBone, boneWeight):
+        self.boneInSelectedVerts_table.setRowCount(0)
+        for i in range(len(weightedBone)):
+            self.boneInSelectedVerts_table.insertRow(i)
+            self.insert_tableItem(i, 0, weightedBone[i])
+            self.insert_tableItem(i, 1, boneWeight[i])
+            self.boneInSelectedVerts_table.setRowHeight(i, 1)
+
+    def insert_tableItem(self, row, column, boneName):
+        item = QtWidgets.QTableWidgetItem(boneName)
+        #get rid of Editable
+        item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+        self.boneInSelectedVerts_table.setItem(row, column, item)
+
     def set_weight_value(self, value):
-        print(value)
+        aaa = self.boneInSelectedVerts_table.selectedRanges()
+        print(aaa)
 
     def refresh_boneInSkin_list(self):
+        self.statusBar.clearMessage()
         self.boneInSkin_list.clear()
         selectedModel = self.get_selectedModel()
-        boneList = self.get_boneListFromModel(selectedModel)
+        selectedSkinCluster = self.get_skinClusterFromModel(selectedModel)
+        boneList = self.get_boneList_from_skinCluster(selectedSkinCluster)
         if len(boneList) > 0:
             for i in range(len(boneList)):
                 self.boneInSkin_list.addItem(boneList[i])
         else:
-            print("please select a model with skin cluster")
+            self.statusBar.showMessage("Please select a model with skin cluster")
 
     def get_selectedModel(self):
         selectedModel = []
@@ -147,43 +269,28 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
                     selectedModel = selectedObj
         return selectedModel
 
-    def get_boneListFromModel(self, model):
+    def get_skinClusterFromModel(self, model):
         selectedSkinCluster = []
-        boneList = []
         if len(model) > 0:
             selectedSkinCluster = mel.eval('findRelatedSkinCluster ' + model)
+        return selectedSkinCluster
 
+    def get_boneList_from_skinCluster(self, selectedSkinCluster):
+        boneList = []
         if len(selectedSkinCluster) > 0:
-            boneList=cmds.skinCluster(selectedSkinCluster, query=True, inf=True)
+            boneList = cmds.skinCluster(selectedSkinCluster, query=True, inf=True)
         return boneList
 
     def clear_boneInSkin_list(self):
         self.boneInSkin_list.clear()
-
-    def refresh_boneInSelectedVerts_table(self):
-        self.boneInSelectedVerts_table.setRowCount(0)
-        selectedModel = self.get_selectedModel()
-        boneList = self.get_boneListFromModel(selectedModel)
-        for i in range(len(boneList)):
-            self.boneInSelectedVerts_table.insertRow(i)
-            self.insert_tableItem(i, 0, boneList[i])
-            self.boneInSelectedVerts_table.setRowHeight(i, 1)
 
     def get_selectedVerts(self):
         selection = cmds.ls(sl=True)
         selectedVerts = cmds.filterExpand(selection, sm=31)
         return selectedVerts
 
-    def get_selectedVertsBoneList(self):
-        pass
-
-    def insert_tableItem(self, row, column, boneName):
-        item = QtWidgets.QTableWidgetItem(boneName)
-        self.boneInSelectedVerts_table.setItem(row, column, item)
-
     def clear_boneInSelectedVerts_table(self):
         self.boneInSelectedVerts_table.setRowCount(0)
-
 
 if __name__ == "__main__":
     try:
