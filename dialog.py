@@ -52,7 +52,9 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
     #selection change call back function for select uv to uv shell
     def maya_selection_changed(self,*args, **kwargs):
         if self.element_cbx.isChecked():
-            self.uvSelectToUvShell()
+            selectedUV = self.get_selected_uv()
+            if len(selectedUV) > 0:
+                self.uvSelectToUvShell()
 
     def create_widgets(self):
         self.editSkin_btn = QtWidgets.QPushButton("Edit Skin")
@@ -71,10 +73,10 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
         self.weight09_btn = QtWidgets.QPushButton("0.9")
         self.weight1_btn = QtWidgets.QPushButton("1")
 
-        self.copy_btn = QtWidgets.QPushButton("Copy")
-        self.paste_btn = QtWidgets.QPushButton("Paste")
+        #self.copy_btn = QtWidgets.QPushButton("Copy")
+        #self.paste_btn = QtWidgets.QPushButton("Paste")
 
-        # TODO use selectionChange callback instead of button
+        # TODO use selectionChange callback instead of button(slow)
         self.getWeighting_btn = QtWidgets.QPushButton("Get selected verts weighting")
 
         self.boneInSelected_label = QtWidgets.QLabel("All weighted Bones in Selected Verts:")
@@ -104,13 +106,12 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
         weightButtonLayout.addWidget(self.weight1_btn)
 
         utilBottonLayout = QtWidgets.QHBoxLayout()
-        utilBottonLayout.addWidget(self.copy_btn)
-        utilBottonLayout.addWidget(self.paste_btn)
+        #utilBottonLayout.addWidget(self.copy_btn)
+        #utilBottonLayout.addWidget(self.paste_btn)
 
         main_layout.addWidget(self.boneInSkin_label)
         main_layout.addWidget(self.boneInSkin_list)
 
-        # TODO main_layout.addWidget(self.line1)
         main_layout.addWidget(self.getWeighting_btn)
         main_layout.addLayout(weightButtonLayout)
         main_layout.addLayout(utilBottonLayout)
@@ -129,6 +130,8 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
         self.weight075_btn.clicked.connect(lambda: self.weight_btn_clicked(0.75))
         self.weight09_btn.clicked.connect(lambda: self.weight_btn_clicked(0.9))
         self.weight1_btn.clicked.connect(lambda: self.weight_btn_clicked(1.0))
+        #self.copy_btn.clicked.connct(self.copy_weighting())
+        #self.paste_btn.clicked.connect(self.paste_weight())
 
     def check_editBtn_status(self):
         btnStatus = self.editSkin_btn.isChecked()
@@ -145,8 +148,6 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
     def edit_skin_checked(self):
         self.statusBar.clearMessage()
         self.refresh_boneInSkin_list()
-        # TODO use selectionChange callback so boneInSelectedVerts_table updates here
-        # self.refresh_boneInSelectedVerts_table()
 
     def edit_skin_unchecked(self):
         self.statusBar.clearMessage()
@@ -172,6 +173,8 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
 
     def get_selected_uv(self):
         selectedUV = cmds.filterExpand(ex=True, sm=35)
+        if selectedUV == None:
+            selectedUV = ''
         return selectedUV
 
     def get_selected_uv_to_verts(self):
@@ -257,13 +260,19 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
         else:
             self.statusBar.showMessage('please select a bone to change weight')
 
+        selectedUV = self.get_selected_uv()
         selectedUVToVerts = self.get_selected_uv_to_verts()
         singleVertList = self.make_single_vert_list(selectedUVToVerts)
         selectedSkinCluster = self.get_skinCLusterFromUVSelection(selectedUVToVerts)
 
         if len(singleVertList) > 0:
-            cmds.select(singleVertList[0])
-            boneWeightOn1stVert = cmds.skinPercent(selectedSkinCluster, singleVertList[0], query=True, value=True)
+            cmds.select(cl=True)
+            for i in range(len(singleVertList)):
+                cmds.select(singleVertList[i])
+                cmds.skinPercent(selectedSkinCluster, singleVertList[i], transformValue=[(selectedBone, weightValue)])
+
+        cmds.select(selectedUV)
+        self.getWeighting_btn_clicked()
 
     def set_weight_with_bone(self, selectedBone, selectedUV):
         pass
