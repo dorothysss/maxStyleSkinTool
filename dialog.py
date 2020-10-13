@@ -13,6 +13,7 @@ import maya.mel as mel
 import pymel.core as pm
 import re
 
+from maya import OpenMaya
 
 def maya_main_window():
     # get maya mainwindow so our dialog could be attached to it
@@ -36,7 +37,6 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
     def __init__(self, parent=maya_main_window()):
         super(maxStyleWeightDialog, self).__init__(parent)
 
-
         self.setWindowTitle("3ds Max Style Weighting Tool")
         self.setMinimumWidth(200)
         self.setMaximumWidth(400)
@@ -46,6 +46,13 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
         self.create_widgets()
         self.create_layouts()
         self.create_connections()
+
+        self.callBack_selectionChange = OpenMaya.MEventMessage.addEventCallback("SelectionChanged", self.maya_selection_changed)
+
+    #selection change call back function for select uv to uv shell
+    def maya_selection_changed(self,*args, **kwargs):
+        if self.element_cbx.isChecked():
+            self.uvSelectToUvShell()
 
     def create_widgets(self):
         self.editSkin_btn = QtWidgets.QPushButton("Edit Skin")
@@ -71,8 +78,7 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
         self.getWeighting_btn = QtWidgets.QPushButton("Get selected verts weighting")
 
         self.boneInSelected_label = QtWidgets.QLabel("All weighted Bones in Selected Verts:")
-        self.boneInSelected_label2 = QtWidgets.QLabel(
-            "(if more than one verts are selected, weight only represent the 1st vert.)")
+        self.boneInSelected_label2 = QtWidgets.QLabel("(if more than one verts are selected, weight only represent the 1st vert.)")
         self.boneInSelectedVerts_table = QtWidgets.QTableWidget()
         self.boneInSelectedVerts_table.setColumnCount(2)
         self.boneInSelectedVerts_table.setHorizontalHeaderLabels(["Bone Name", "Weight"])
@@ -319,8 +325,9 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
     def clear_boneInSelectedVerts_table(self):
         self.boneInSelectedVerts_table.setRowCount(0)
 
-    def closeEvent(self, event):
-        print('closeEvent')
+    def hideEvent(self, event):
+        print('hideEvent')
+        OpenMaya.MMessage.removeCallback(self.callBack_selectionChange)
 
 
 if __name__ == "__main__":
