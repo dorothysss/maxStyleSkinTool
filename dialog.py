@@ -40,6 +40,7 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
         self.setWindowTitle("3ds Max Style Weighting Tool")
         self.setMinimumWidth(200)
         self.setMaximumWidth(400)
+        self.setMinimumHeight(600)
         # remove question mark(help button)
         self.setWindowFlags(self.windowFlags() ^ QtCore.Qt.WindowContextHelpButtonHint)
 
@@ -60,10 +61,10 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
         self.editSkin_btn = QtWidgets.QPushButton("Edit Skin")
         self.editSkin_btn.setCheckable(True)
         self.element_cbx = QtWidgets.QCheckBox("Select Element")
-        self.boneInSkin_label = QtWidgets.QLabel("Bones in Skin Cluster:")
+        #self.boneInSkin_label = QtWidgets.QLabel("Bones in Skin Cluster:")
         # TODO self.line1 = QtWidgets.QGraphicsLineItem()
-        self.boneInSkin_list = QtWidgets.QListWidget()
-        self.boneInSkin_list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        #self.boneInSkin_list = QtWidgets.QListWidget()
+        #self.boneInSkin_list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
 
         self.weight0_btn = QtWidgets.QPushButton("0")
         self.weight01_btn = QtWidgets.QPushButton("0.1")
@@ -81,12 +82,12 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
 
         self.boneInSelected_label = QtWidgets.QLabel("All weighted Bones in Selected Verts:")
         self.boneInSelected_label2 = QtWidgets.QLabel("(if more than one verts are selected, weight only represent the 1st vert.)")
-        self.boneInSelectedVerts_table = QtWidgets.QTableWidget()
-        self.boneInSelectedVerts_table.setColumnCount(2)
-        self.boneInSelectedVerts_table.setHorizontalHeaderLabels(["Bone Name", "Weight"])
-        self.boneInSelectedVerts_table.setColumnWidth(0, 250)
-        self.boneInSelectedVerts_table.setColumnWidth(1, 50)
-        tableHeader = self.boneInSelectedVerts_table.horizontalHeader()
+        self.boneAndWeight_table = QtWidgets.QTableWidget()
+        self.boneAndWeight_table.setColumnCount(2)
+        self.boneAndWeight_table.setHorizontalHeaderLabels(["Bone Name", "Weight"])
+        self.boneAndWeight_table.setColumnWidth(0, 250)
+        self.boneAndWeight_table.setColumnWidth(1, 50)
+        tableHeader = self.boneAndWeight_table.horizontalHeader()
         tableHeader.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
 
         self.statusBar = QtWidgets.QStatusBar()
@@ -109,20 +110,20 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
         #utilBottonLayout.addWidget(self.copy_btn)
         #utilBottonLayout.addWidget(self.paste_btn)
 
-        main_layout.addWidget(self.boneInSkin_label)
-        main_layout.addWidget(self.boneInSkin_list)
+        #main_layout.addWidget(self.boneInSkin_label)
+        #main_layout.addWidget(self.boneInSkin_list)
 
         main_layout.addWidget(self.getWeighting_btn)
         main_layout.addLayout(weightButtonLayout)
         main_layout.addLayout(utilBottonLayout)
         main_layout.addWidget(self.boneInSelected_label)
         main_layout.addWidget(self.boneInSelected_label2)
-        main_layout.addWidget(self.boneInSelectedVerts_table)
+        main_layout.addWidget(self.boneAndWeight_table)
         main_layout.addWidget(self.statusBar)
 
     def create_connections(self):
         self.editSkin_btn.toggled.connect(self.check_editBtn_status)
-        self.getWeighting_btn.clicked.connect(self.getWeighting_btn_clicked)
+        self.getWeighting_btn.clicked.connect(self.refresh_boneAndWeight_table_boneAndWeight)
         self.weight0_btn.clicked.connect(lambda: self.weight_btn_clicked(0))
         self.weight01_btn.clicked.connect(lambda: self.weight_btn_clicked(0.1))
         self.weight025_btn.clicked.connect(lambda: self.weight_btn_clicked(0.25))
@@ -139,7 +140,7 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
         if btnStatus:
             # TODO check when selection mode is not in object
             self.edit_skin_checked()
-            pm.mel.doMenuComponentSelection(selectedModel, "puv")
+            #pm.mel.doMenuComponentSelection(selectedModel, "puv")
         else:
             # TODO check when selection mode is not in object
             self.edit_skin_unchecked()
@@ -147,14 +148,32 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
 
     def edit_skin_checked(self):
         self.statusBar.clearMessage()
-        self.refresh_boneInSkin_list()
+        #self.refresh_boneInSkin_list()
+        self.refresh_boneAndWeight_table_bonesOnly()
 
     def edit_skin_unchecked(self):
         self.statusBar.clearMessage()
-        self.clear_boneInSkin_list()
-        self.clear_boneInSelectedVerts_table()
+        #self.clear_boneInSkin_list()
+        self.clear_boneAndWeight_table()
 
-    def getWeighting_btn_clicked(self):
+    def refresh_boneAndWeight_table_bonesOnly(self):
+        selectedModel = self.get_selectedModel()
+        self.boneAndWeight_table.setRowCount(0)
+        self.statusBar.clearMessage()
+        selectedModel = self.get_selectedModel()
+        selectedSkinCluster = self.get_skinClusterFromModel(selectedModel)
+        boneList = self.get_boneList_from_skinCluster(selectedSkinCluster)
+        if len(boneList) > 0:
+            for i in range(len(boneList)):
+                self.boneAndWeight_table.insertRow(i)
+                self.insert_tableItem(i, 0, boneList[i])
+                self.boneAndWeight_table.setRowHeight(i, 1)
+            pm.mel.doMenuComponentSelection(selectedModel, "puv")
+        else:
+            self.statusBar.showMessage("Please select a model with skin cluster")
+
+    def refresh_boneAndWeight_table_boneAndWeight(self):
+        self.boneAndWeight_table.setRowCount(0)
         selectedModel = self.get_selectedModel()
         pm.mel.doMenuComponentSelection(selectedModel, "puv")
 
@@ -162,14 +181,37 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
 
         selectedUVToVert = self.get_selected_uv_to_verts()
         selectedSkinCluster = self.get_skinClusterFromModel(selectedModel)
+        boneInSkinCluster = self.get_boneList_from_skinCluster(selectedSkinCluster)
 
         (weightedBones, boneWeight) = self.get_boneAndWeight_from_verts(selectedSkinCluster, selectedUVToVert)
-        self.refresh_boneInSelectedVerts_table(weightedBones, boneWeight)
 
-        #pm.mel.doMenuComponentSelection(selectedModel, "puv")
-        #cmds.select(cl=True)
-        cmds.select(selectedUV)
+        for i in range(len(weightedBones)):
+            self.boneAndWeight_table.insertRow(i)
+            self.insert_tableItem(i, 0, weightedBones[i])
+            self.insert_tableItem(i, 1, boneWeight[i])
+            self.boneAndWeight_table.setRowHeight(i, 1)
+
+        for i in range(len(weightedBones)):
+            if weightedBones[i] in boneInSkinCluster:
+                boneInSkinCluster.remove(weightedBones[i])
+
+        #only not weighted bones are left
+        currentRowCount = self.boneAndWeight_table.rowCount()
+        for i in range(len(boneInSkinCluster)):
+            self.boneAndWeight_table.insertRow(currentRowCount+i)
+            self.insert_tableItem(currentRowCount+i, 0, boneInSkinCluster[i], False)
+            self.boneAndWeight_table.setRowHeight(currentRowCount+i, 1)
+
         self.statusBar.showMessage("{num} of verts selected".format(num=len(selectedUVToVert)))
+        cmds.select(selectedUV)
+
+    def insert_tableItem(self, row, column, boneName,weighted=True):
+        item = QtWidgets.QTableWidgetItem(boneName)
+        # get rid of Editable
+        item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+        self.boneAndWeight_table.setItem(row, column, item)
+        if weighted ==False:
+            item.setBackgroundColor('black')
 
     def get_selected_uv(self):
         selectedUV = cmds.filterExpand(ex=True, sm=35)
@@ -185,12 +227,12 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
 
     def get_boneAndWeight_from_verts(self, selectedSkinCluster, selectedVerts):
         weightedBoneList = []
+        shownWeightList = []
         singleVertList = self.make_single_vert_list(selectedVerts)
         if len(singleVertList) > 0:
             # only show 1st vert's weight value if more than 1 verts are selected
             cmds.select(singleVertList[0])
             boneWeightOn1stVert = cmds.skinPercent(selectedSkinCluster, singleVertList[0], query=True, value=True)
-            shownWeightList = []
             fullBoneList = self.get_boneList_from_skinCluster(selectedSkinCluster)
             for i in range(len(singleVertList)):
                 cmds.select(singleVertList[i])
@@ -236,27 +278,13 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
 
         return singleVertsList
 
-    def refresh_boneInSelectedVerts_table(self, weightedBone, boneWeight):
-        self.boneInSelectedVerts_table.setRowCount(0)
-        for i in range(len(weightedBone)):
-            self.boneInSelectedVerts_table.insertRow(i)
-            self.insert_tableItem(i, 0, weightedBone[i])
-            self.insert_tableItem(i, 1, boneWeight[i])
-            self.boneInSelectedVerts_table.setRowHeight(i, 1)
-
-    def insert_tableItem(self, row, column, boneName):
-        item = QtWidgets.QTableWidgetItem(boneName)
-        #get rid of Editable
-        item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
-        self.boneInSelectedVerts_table.setItem(row, column, item)
-
     def weight_btn_clicked(self, weightValue):
         self.statusBar.clearMessage()
         selectedBone = ''
         #TODO list and table widgt can only have 1 selection
-        selectedRow = self.boneInSelectedVerts_table.currentRow()
+        selectedRow = self.boneAndWeight_table.currentRow()
         if selectedRow != -1:
-            selectedBone = self.boneInSelectedVerts_table.item(selectedRow, 0).text()
+            selectedBone = self.boneAndWeight_table.item(selectedRow, 0).text()
         else:
             self.statusBar.showMessage('please select a bone to change weight')
 
@@ -272,7 +300,7 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
                 cmds.skinPercent(selectedSkinCluster, singleVertList[i], transformValue=[(selectedBone, weightValue)])
 
         cmds.select(selectedUV)
-        self.getWeighting_btn_clicked()
+        self.refresh_boneAndWeight_table_boneAndWeight()
 
     def set_weight_with_bone(self, selectedBone, selectedUV):
         pass
@@ -286,18 +314,6 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
             selectedModel = selectedUV[0].split('.')[0]
             selectedSkinCluster = self.get_skinClusterFromModel(selectedModel)
         return selectedSkinCluster
-
-    def refresh_boneInSkin_list(self):
-        self.statusBar.clearMessage()
-        self.boneInSkin_list.clear()
-        selectedModel = self.get_selectedModel()
-        selectedSkinCluster = self.get_skinClusterFromModel(selectedModel)
-        boneList = self.get_boneList_from_skinCluster(selectedSkinCluster)
-        if len(boneList) > 0:
-            for i in range(len(boneList)):
-                self.boneInSkin_list.addItem(boneList[i])
-        else:
-            self.statusBar.showMessage("Please select a model with skin cluster")
 
     def get_selectedModel(self):
         selectedModel = []
@@ -323,16 +339,13 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
             boneList = cmds.skinCluster(selectedSkinCluster, query=True, inf=True)
         return boneList
 
-    def clear_boneInSkin_list(self):
-        self.boneInSkin_list.clear()
-
     def get_selectedVerts(self):
         selection = cmds.ls(sl=True)
         selectedVerts = cmds.filterExpand(selection, sm=31)
         return selectedVerts
 
-    def clear_boneInSelectedVerts_table(self):
-        self.boneInSelectedVerts_table.setRowCount(0)
+    def clear_boneAndWeight_table(self):
+        self.boneAndWeight_table.setRowCount(0)
 
     def hideEvent(self, event):
         print('hideEvent')
