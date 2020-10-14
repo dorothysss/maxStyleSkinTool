@@ -1,6 +1,8 @@
 """
 ===================================================================================================================
 run this script directly or source in the script and run maxStyleSkinTool.dialog.maxStyleWeightDialog.show_dialog()
+
+strugglesheng@gmail.com
 ===================================================================================================================
 """
 
@@ -13,6 +15,8 @@ import maya.mel as mel
 import pymel.core as pm
 import re
 from maya import OpenMaya
+
+
 
 
 def maya_main_window():
@@ -36,6 +40,8 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
 
     def __init__(self, parent=maya_main_window()):
         super(maxStyleWeightDialog, self).__init__(parent)
+
+        mel.eval("""if(!`exists doMenuComponentSelection`) eval("source dagMenuProc");""")
 
         self.setWindowTitle("3ds Max Style Weighting Tool")
         self.setMinimumWidth(200)
@@ -312,7 +318,6 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
         return selectedSkinCluster
 
     def get_selectedModel(self):
-        """pass"""
         selectedModel = []
         selection = cmds.ls(objectsOnly=True, sl=True)
         if len(selection) > 0:
