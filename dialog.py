@@ -212,7 +212,7 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
                 self.boneAndWeight_table.setRowHeight(i, 1)
 
             for w in weightedBones:
-                if weightedBones[i] in boneInSkinCluster:
+                if w in boneInSkinCluster:
                     boneInSkinCluster.remove(w)
 
             # only not weighted bones are left
