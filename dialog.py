@@ -61,13 +61,14 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
     def maya_selection_changed(self, *args, **kwargs):
         if self.element_cbx.isChecked():
             selectedUV = self.get_selected_uv()
-            if len(selectedUV) > 0:
+            if selectedUV:
                 self.uvSelectToUvShell()
 
     def create_widgets(self):
         self.editSkin_btn = QtWidgets.QPushButton("Edit Skin")
         self.editSkin_btn.setCheckable(True)
         self.element_cbx = QtWidgets.QCheckBox("Select Element")
+        self.resumeMesh_btn = QtWidgets.QPushButton("Resume mesh after bone transform change")
 
         self.weight0_btn = QtWidgets.QPushButton("0")
         self.weight01_btn = QtWidgets.QPushButton("0.1")
@@ -99,7 +100,9 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
 
     def create_layouts(self):
         main_layout = QtWidgets.QVBoxLayout(self)
+
         main_layout.addWidget(self.editSkin_btn)
+        main_layout.addWidget(self.resumeMesh_btn)
         main_layout.addWidget(self.element_cbx)
 
         weightButtonLayout = QtWidgets.QHBoxLayout()
@@ -123,6 +126,7 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
 
     def create_connections(self):
         self.editSkin_btn.toggled.connect(self.check_editBtn_status)
+        self.resumeMesh_btn.clicked.connect(self.resume_mesh_clicked)
         self.getWeighting_btn.clicked.connect(self.refresh_boneAndWeight_table_boneAndWeight)
         self.weight0_btn.clicked.connect(lambda: self.weight_btn_clicked(0))
         self.weight01_btn.clicked.connect(lambda: self.weight_btn_clicked(0.1))
@@ -154,13 +158,26 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
         self.statusBar.clearMessage()
         self.clear_boneAndWeight_table()
 
+    def resume_mesh_clicked(self):
+        selectedModel = self.get_selectedModel()
+        selectedSkinCluster = self.get_skinClusterFromModel(selectedModel)
+        print(selectedSkinCluster)
+        if selectedSkinCluster:
+            boneList = self.get_boneList_from_skinCluster(selectedSkinCluster)
+            mel.eval("""doDetachSkin "2" {"2", "0"}""")
+            cmds.select(boneList)
+            cmds.select(selectedModel, add=True)
+            cmds.skinCluster()
+        else:
+            self.statusBar.showMessage("Select a model with skinCluster")
+
     def refresh_boneAndWeight_table_bonesOnly(self):
         self.boneAndWeight_table.setRowCount(0)
         self.statusBar.clearMessage()
         selectedModel = self.get_selectedModel()
         selectedSkinCluster = self.get_skinClusterFromModel(selectedModel)
         boneList = self.get_boneList_from_skinCluster(selectedSkinCluster)
-        if len(boneList) > 0:
+        if boneList:
             for i in range(len(boneList)):
                 self.boneAndWeight_table.insertRow(i)
                 self.insert_tableItem(i, 0, boneList[i])
@@ -182,7 +199,7 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
         selectedSkinCluster = self.get_skinClusterFromModel(selectedModel)
         boneInSkinCluster = self.get_boneList_from_skinCluster(selectedSkinCluster)
 
-        if len(selectedSingleVerts) > 0 and len(selectedSkinCluster) > 0:
+        if selectedSingleVerts and selectedSkinCluster:
             (weightedBones, boneWeightOn1stVert) = self.get_boneAndWeight_from_verts(selectedSkinCluster,
                                                                                      selectedSingleVerts)
             boneCountOn1stVert = len(boneWeightOn1stVert)
@@ -235,11 +252,11 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
         showBoneList = []
         fullBoneList = self.get_boneList_from_skinCluster(selectedSkinCluster)
         # singleVertList = self.make_single_vert_list(selectedVerts)
-        if len(selectedVerts) > 0:
+        if selectedVerts:
             # only show 1st vert's weight value if more than 1 verts are selected
             cmds.select(selectedVerts[0])
             boneWeightOn1stVert = cmds.skinPercent(selectedSkinCluster, selectedVerts[0], query=True, value=True)
-            if len(boneWeightOn1stVert) > 0:
+            if boneWeightOn1stVert:
                 for i in range(len(boneWeightOn1stVert)):
                     if boneWeightOn1stVert[i] > 0.01:
                         shownWeightList.append(boneWeightOn1stVert[i])
@@ -257,7 +274,7 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
 
     def get_single_vert_list(self, selectedVerts):
         fullSingleVertList = []
-        if len(selectedVerts) > 0:
+        if selectedVerts:
             for i in range(len(selectedVerts)):
                 if ':' in selectedVerts[i]:
                     singleVerList = self.split_multiple_verts(selectedVerts[i])
@@ -270,7 +287,7 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
         # multiple verts is something like 'testMesh.vtx[8162:8163]'
         # return a list like ['testMesh.vtx[8162]','testMesh.vtx[8163]']
         singleVertsList = []
-        if len(multipleVerts) > 0:
+        if multipleVerts:
             strPrefix = multipleVerts.split('[')
             # result: 'testMesh.vtx'
 
@@ -298,7 +315,7 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
         singleVertList = self.get_single_vert_list(selectedUVToVerts)
         selectedSkinCluster = self.get_skinCLusterFromUVSelection(selectedUVToVerts)
 
-        if len(singleVertList) > 0:
+        if singleVertList:
             cmds.select(cl=True)
             for i in range(len(singleVertList)):
                 cmds.select(singleVertList[i])
@@ -312,7 +329,7 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
 
     def get_skinCLusterFromUVSelection(self, selectedUV):
         selectedSkinCluster = ''
-        if len(selectedUV) > 0:
+        if selectedUV:
             selectedModel = selectedUV[0].split('.')[0]
             selectedSkinCluster = self.get_skinClusterFromModel(selectedModel)
         return selectedSkinCluster
@@ -320,7 +337,7 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
     def get_selectedModel(self):
         selectedModel = []
         selection = cmds.ls(objectsOnly=True, sl=True)
-        if len(selection) > 0:
+        if selection:
             if cmds.objectType(selection[0]) == 'transform':
                 selectedModel = selection[0]
             else:
@@ -331,17 +348,17 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
 
     def get_skinClusterFromModel(self, model):
         returnSkinCluster = []
-        if len(model) > 0:
+        if model:
             selectedSkinCluster = mel.eval('findRelatedSkinCluster ' + model)
-            if len(selectedSkinCluster) > 0:
+            if selectedSkinCluster:
                 returnSkinCluster = selectedSkinCluster
         return returnSkinCluster
 
     def get_boneList_from_skinCluster(self, selectedSkinCluster):
         returnBoneList = []
-        if len(selectedSkinCluster) > 0:
+        if selectedSkinCluster:
             boneList = cmds.skinCluster(selectedSkinCluster, query=True, inf=True)
-            if len(boneList) > 0:
+            if boneList:
                 returnBoneList = boneList
         return returnBoneList
 
