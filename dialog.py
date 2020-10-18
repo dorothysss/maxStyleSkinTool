@@ -211,9 +211,9 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
                     self.insert_tableItem(i, 1, boneWeightOn1stVert[i])
                 self.boneAndWeight_table.setRowHeight(i, 1)
 
-            for i in range(len(weightedBones)):
+            for w in weightedBones:
                 if weightedBones[i] in boneInSkinCluster:
-                    boneInSkinCluster.remove(weightedBones[i])
+                    boneInSkinCluster.remove(w)
 
             # only not weighted bones are left
             currentRowCount = self.boneAndWeight_table.rowCount()
@@ -275,12 +275,12 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
     def get_single_vert_list(self, selectedVerts):
         fullSingleVertList = []
         if selectedVerts:
-            for i in range(len(selectedVerts)):
-                if ':' in selectedVerts[i]:
-                    singleVerList = self.split_multiple_verts(selectedVerts[i])
+            for s in selectedVerts:
+                if ':' in s:
+                    singleVerList = self.split_multiple_verts(s)
                     fullSingleVertList.extend(singleVerList)
                 else:
-                    fullSingleVertList.append(selectedVerts[i])
+                    fullSingleVertList.append(s)
         return fullSingleVertList
 
     def split_multiple_verts(self, multipleVerts):
@@ -317,9 +317,9 @@ class maxStyleWeightDialog(QtWidgets.QDialog):
 
         if singleVertList:
             cmds.select(cl=True)
-            for i in range(len(singleVertList)):
-                cmds.select(singleVertList[i])
-                cmds.skinPercent(selectedSkinCluster, singleVertList[i], transformValue=[(selectedBone, weightValue)])
+            for s in singleVertList:
+                cmds.select(s)
+                cmds.skinPercent(selectedSkinCluster, s, transformValue=[(selectedBone, weightValue)])
 
         cmds.select(selectedUV)
         self.refresh_boneAndWeight_table_boneAndWeight()
